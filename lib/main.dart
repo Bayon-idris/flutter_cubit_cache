@@ -12,20 +12,26 @@ import 'presentation/pages/home_page.dart';
 import 'data/repositories/tasks_repository.dart';
 
 void main() {
-  runApp(const MyApp());
+  final dio = Dio();
+
+  runApp(MyApp(dio: dio));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final Dio dio;
+
+  const MyApp({super.key, required this.dio});
 
   @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider<TaskCubit>(
+        BlocProvider(
           create: (context) => TaskCubit(
-              repository: TaskRepository(remoteSource: TaskRemoteSource(Dio())))
-            ..fetchTasks(),
+            repository: TaskRepository(
+              remoteSource: TaskRemoteSource(dio),
+            ),
+          ),
         ),
       ],
       child: const MaterialApp(

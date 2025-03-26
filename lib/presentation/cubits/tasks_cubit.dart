@@ -6,7 +6,9 @@ import '../../data/repositories/tasks_repository.dart';
 class TaskCubit extends Cubit<TaskState> {
   final TaskRepository repository;
 
-  TaskCubit({required this.repository}) : super(TaskInitial());
+  TaskCubit({required this.repository}) : super(TaskInitial()) {
+    fetchTasks();
+  }
 
   // Récupérer les tâches (affiche le cache d’abord)
   Future<void> fetchTasks() async {
@@ -20,14 +22,22 @@ class TaskCubit extends Cubit<TaskState> {
   }
 
   // Ajouter une tâche
-  Future<void> addTask(Task task) async {
-    try {
-      await repository.add(task);
-      fetchTasks(); // Rafraîchir la liste
-    } catch (e) {
-      emit(TaskError('Erreur lors de l\'ajout de la tâche'));
+  Future<void> addTask(Task newTask) async {
+    final currentState = state;
+    if (currentState is TaskLoaded) {
+      final updatedTasks = List<Task>.from(currentState.tasks)..add(newTask);
+      emit(TaskLoaded(updatedTasks)); // ✅ Met à jour la liste immédiatement
+
+      try {
+        final addedTask = await repository.add(newTask);
+        final finalTasks = List<Task>.from(updatedTasks)..remove(newTask)..add(addedTask);
+        emit(TaskLoaded(finalTasks)); // ✅ Met à jour avec la vraie réponse de l’API
+      } catch (e) {
+        emit(TaskLoaded(currentState.tasks)); // ❌ Annule l'ajout en cas d'erreur
+      }
     }
   }
+
 
   // Mettre à jour une tâche
   Future<void> updateTask(Task task) async {
@@ -40,12 +50,18 @@ class TaskCubit extends Cubit<TaskState> {
   }
 
   // Supprimer une tâche
-  Future<void> deleteTask(String id) async {
-    try {
-      await repository.delete(id);
-      fetchTasks(); // Rafraîchir
-    } catch (e) {
-      emit(TaskError('Erreur lors de la suppression de la tâche'));
+  Future<void> deleteTask(String taskId) async {
+    final currentState = state;
+    if (currentState is TaskLoaded) {
+      final updatedTasks = currentState.tasks.where((task) => task.id != taskId).toList();
+      emit(TaskLoaded(updatedTasks)); // ✅ Supprime immédiatement la tâche de la liste
+
+      try {
+        await repository.delete(taskId);
+      } catch (e) {
+        emit(TaskLoaded(currentState.tasks)); // ❌ Si erreur, on remet l’ancienne liste
+      }
     }
   }
+
 }
