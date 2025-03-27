@@ -1,11 +1,12 @@
 import 'package:bloc/bloc.dart';
+import 'package:flutter_cubit_cache/core/utils/constants.dart';
 import 'package:flutter_cubit_cache/presentation/cubits/tasks_state.dart';
+
 import '../../data/models/task_model.dart';
 import '../../data/repositories/tasks_repository.dart';
 
 class TaskCubit extends Cubit<TaskState> {
   final TaskRepository repository;
-  static const int cacheDuration = 3600; // 1 hour in seconds
 
   TaskCubit({required this.repository}) : super(TaskInitial()) {
     fetchTasks();
@@ -16,7 +17,8 @@ class TaskCubit extends Cubit<TaskState> {
     final lastFetchTime = repository.localSource.getLastFetchTime();
     final currentTime = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
-    if (cachedTasks.isNotEmpty && (currentTime - lastFetchTime!) < cacheDuration) {
+    if (cachedTasks.isNotEmpty &&
+        (currentTime - lastFetchTime!) < AppConstants.cacheDuration) {
       emit(TaskLoaded(cachedTasks));
     } else {
       try {
@@ -63,7 +65,7 @@ class TaskCubit extends Cubit<TaskState> {
     final currentState = state;
     if (currentState is TaskLoaded) {
       final updatedTasks =
-      currentState.tasks.where((task) => task.id != taskId).toList();
+          currentState.tasks.where((task) => task.id != taskId).toList();
       emit(TaskLoaded(updatedTasks));
 
       try {
