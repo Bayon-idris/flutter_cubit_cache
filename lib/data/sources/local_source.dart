@@ -24,4 +24,15 @@ class TaskLocalSource {
   Future<void> clearTasks() async {
     await _taskBox.clear();
   }
+
+  Future<void> setLastFetchTime(int currentTime) async {
+    final box = await Hive.openBox('taskCacheMetadata');
+    await box.put('lastFetchTime', currentTime);
+  }
+
+
+  int? getLastFetchTime() {
+    final box = Hive.box('taskCacheMetadata');
+    return box.get('lastFetchTime') as int?;
+  }
 }
