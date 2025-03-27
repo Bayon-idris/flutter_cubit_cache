@@ -1,16 +1,28 @@
+import 'package:hive/hive.dart';
+
+part 'task_model.g.dart';
+
+// 📌 Indique que cette classe est un modèle Hive avec un type ID unique
+@HiveType(typeId: 0)
 class Task {
+  // 📌 Chaque champ doit avoir un index unique pour Hive
+  @HiveField(0)
   final String id;
+
+  @HiveField(1)
   final String name;
+
+  @HiveField(2)
   final String description;
+
+  @HiveField(3)
   final String createdAt;
-  final bool completed;
 
   Task({
     required this.id,
     required this.name,
     required this.description,
     required this.createdAt,
-    this.completed = false,
   });
 
   factory Task.fromJson(Map<String, dynamic> json) {
@@ -19,7 +31,6 @@ class Task {
       name: json['name'],
       description: json['description'],
       createdAt: json['createdAt'],
-      completed: json['completed'] ?? false,
     );
   }
 
@@ -29,7 +40,6 @@ class Task {
       'name': name,
       'description': description,
       'createdAt': createdAt,
-      'completed': completed,
     };
   }
 }

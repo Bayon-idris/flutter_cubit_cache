@@ -10,15 +10,32 @@ class TaskCubit extends Cubit<TaskState> {
     fetchTasks();
   }
 
-  // Récupérer les tâches (affiche le cache d’abord)
-  Future<void> fetchTasks() async {
-    try {
-      emit(TaskLoading()); // Loader uniquement si c'est le premier appel
-      final tasks = await repository.fetchAll();
-      emit(TaskLoaded(tasks));
-    } catch (e) {
-      emit(TaskError('Erreur lors du chargement des tâches'));
+  void fetchTasks() async {
+    // 🔹 1. Charger les tâches en cache immédiatement
+    final cachedTasks = repository.localSource.getTasks();
+    if (cachedTasks.isNotEmpty) {
+      emit(TaskLoaded(cachedTasks));
     }
+
+    // 🔹 2. Aller chercher les nouvelles tâches en ligne (en arrière-plan) uniquement si elles ont changé
+    try {
+      final freshTasks = await repository.fetchAll();
+      if (_tasksHaveChanged(cachedTasks, freshTasks)) {
+        repository.localSource.saveTasks(freshTasks); // Mettre à jour le cache
+        emit(TaskLoaded(freshTasks)); // Mise à jour de l'UI
+      }
+    } catch (e) {
+      if (cachedTasks.isEmpty) {
+        emit(TaskError("Échec du chargement des tâches"));
+      }
+    }
+  }
+
+  // Vérifier si les tâches ont changé
+  bool _tasksHaveChanged(List<Task> cachedTasks, List<Task> freshTasks) {
+    return cachedTasks.length != freshTasks.length ||
+        !cachedTasks.every((cachedTask) =>
+            freshTasks.any((freshTask) => freshTask.id == cachedTask.id && freshTask.name == cachedTask.name && freshTask.description == cachedTask.description));
   }
 
   // Ajouter une tâche
@@ -30,14 +47,16 @@ class TaskCubit extends Cubit<TaskState> {
 
       try {
         final addedTask = await repository.add(newTask);
-        final finalTasks = List<Task>.from(updatedTasks)..remove(newTask)..add(addedTask);
-        emit(TaskLoaded(finalTasks)); // ✅ Met à jour avec la vraie réponse de l’API
+        final finalTasks = List<Task>.from(updatedTasks)
+          ..remove(newTask)
+          ..add(addedTask);
+        repository.localSource.saveTasks(finalTasks); // ✅ Met à jour le cache
+        emit(TaskLoaded(finalTasks)); // ✅ Mise à jour avec la vraie réponse de l’API
       } catch (e) {
         emit(TaskLoaded(currentState.tasks)); // ❌ Annule l'ajout en cas d'erreur
       }
     }
   }
-
 
   // Mettre à jour une tâche
   Future<void> updateTask(Task task) async {
@@ -58,10 +77,10 @@ class TaskCubit extends Cubit<TaskState> {
 
       try {
         await repository.delete(taskId);
+        repository.localSource.saveTasks(updatedTasks); // ✅ Met à jour le cache
       } catch (e) {
         emit(TaskLoaded(currentState.tasks)); // ❌ Si erreur, on remet l’ancienne liste
       }
     }
   }
-
 }
