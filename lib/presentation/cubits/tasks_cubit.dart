@@ -14,52 +14,60 @@ class TaskCubit extends Cubit<TaskState> {
 
   void fetchTasks() async {
     final cachedTasks = repository.localSource.getTasks();
-    final lastFetchTime = repository.localSource.getLastFetchTime();
-    final currentTime = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final currentTime = DateTime.now().millisecondsSinceEpoch;
+    final lastFetchTime = await repository.localSource.getLastFetchTime();
 
-    if (cachedTasks.isNotEmpty &&
-        (currentTime - lastFetchTime!) < AppConstants.cacheDuration) {
+    // 🔹 1. Toujours afficher les tâches en cache immédiatement
+    if (cachedTasks.isNotEmpty) {
       emit(TaskLoaded(cachedTasks));
-    } else {
-      try {
-        final freshTasks = await repository.fetchAll();
-        repository.localSource.saveTasks(freshTasks);
-        repository.localSource.setLastFetchTime(currentTime);
+    }
+
+    // 🔹 2. Vérifier si on doit rafraîchir les données
+    final shouldFetch = cachedTasks.isEmpty ||
+        (lastFetchTime == null || (currentTime - lastFetchTime) >= AppConstants.cacheDuration);
+
+    if (!shouldFetch) return; // Pas besoin d’appeler l’API
+
+    if (cachedTasks.isEmpty) {
+      emit(TaskLoading());
+    }
+
+    try {
+      final freshTasks = await repository.fetchAll();
+      if (freshTasks.isEmpty) {
+        emit(TaskEmpty());
+      } else {
         emit(TaskLoaded(freshTasks));
-      } catch (e) {
-        if (cachedTasks.isEmpty) {
-          emit(TaskError("Échec du chargement des tâches"));
-        }
+      }
+
+      repository.localSource.saveTasks(freshTasks);
+      repository.localSource.setLastFetchTime(currentTime);
+    } catch (e) {
+      if (cachedTasks.isEmpty) {
+        emit(TaskError("Échec du chargement des tâches"));
       }
     }
   }
+
 
   Future<void> addTask(Task newTask) async {
     final currentState = state;
     if (currentState is TaskLoaded) {
       final updatedTasks = List<Task>.from(currentState.tasks)..add(newTask);
       emit(TaskLoaded(updatedTasks));
-
       try {
         final addedTask = await repository.add(newTask);
         final finalTasks = List<Task>.from(updatedTasks)
           ..remove(newTask)
           ..add(addedTask);
+
         emit(TaskLoaded(finalTasks));
       } catch (e) {
-        emit(TaskLoaded(currentState.tasks));
+        emit(TaskLoaded(currentState.tasks)); // Annule en cas d'erreur
       }
     }
   }
 
-  Future<void> updateTask(Task task) async {
-    try {
-      await repository.update(task);
-      fetchTasks();
-    } catch (e) {
-      emit(TaskError('Erreur lors de la mise à jour de la tâche'));
-    }
-  }
 
   Future<void> deleteTask(String taskId) async {
     final currentState = state;

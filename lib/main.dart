@@ -39,7 +39,7 @@ class MyApp extends StatelessWidget {
         ),
       ],
       child: const MaterialApp(
-        debugShowCheckedModeBanner: false,
+        debugShowCheckedModeBanner: true,
         home: TasksPage(),
       ),
     );
